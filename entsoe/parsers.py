@@ -538,46 +538,7 @@ def _parse_contracted_reserve_series(soup, tz, label):
     -------
     pd.Series
     """
-    # Parse all periods (handle both France: 1 Period/24 Points and Belgium: 24 Periods/1 Point)
-    periods = soup.find_all('period')
-    data = {}
-    
-    for period in periods:
-        start = pd.Timestamp(period.find('start').text)
-        end = pd.Timestamp(period.find('end').text)
-        delta_text = _resolution_to_timedelta(period.find('resolution').text)
-        delta = pd.Timedelta(delta_text)
-        
-        # Build dict mapping timestamp -> value using positions for this period
-        for point in period.find_all('point'):
-            position = int(point.find('position').text)
-            value = float(point.find(label).text)
-            timestamp = start + (position - 1) * delta
-            data[timestamp] = value
-    
-    # Create Series and sort
-    S = pd.Series(data).sort_index()
-    
-    # Handle curveType A03: forward fill missing positions
-    # See: https://eepublicdownloads.entsoe.eu/clean-documents/EDI/Library/cim_based/Introduction_of_different_Timeseries_possibilities__curvetypes__with_ENTSO-E_electronic_document_v1.4.pdf
-    curvetype_elem = soup.find('curvetype')
-    if curvetype_elem and curvetype_elem.text == 'A03':
-        if len(periods) == 1:
-            # Single period structure (like France): forward fill to 15min resolution
-            period = periods[0]
-            start = pd.Timestamp(period.find('start').text)
-            end = pd.Timestamp(period.find('end').text)
-            # Force 15-minute resolution for consistency
-            S = S.reindex(pd.date_range(start, end, freq='15min')).ffill()
-        else:
-            # Multi-period structure (like Belgium): forward fill to 15min resolution
-            # Get overall time range from first and last periods
-            first_period = periods[0]
-            last_period = periods[-1]
-            overall_start = pd.Timestamp(first_period.find('start').text)
-            overall_end = pd.Timestamp(last_period.find('end').text)
-            # Reindex to 15-minute intervals and forward fill
-            S = S.reindex(pd.date_range(overall_start, overall_end, freq='15min')).ffill()
+    S = _parse_timeseries_generic(soup, label=label, merge_series=True).sort_index()
     
     # Convert to DataFrame
     df = pd.DataFrame(S, columns=[label])
