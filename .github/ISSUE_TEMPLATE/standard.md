@@ -1,3 +1,8 @@
+---
+name: Standard Issue
+about: Report a bug or broken implementation
+---
+
 <!--
 Please provide a minimum reproducible example when reporting a bug or broken implementation.
 
