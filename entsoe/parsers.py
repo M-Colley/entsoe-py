@@ -18,15 +18,17 @@ GENERATION_ELEMENT = "inBiddingZone_Domain.mRID"
 CONSUMPTION_ELEMENT = "outBiddingZone_Domain.mRID"
 
 
-def parse_prices(xml_text):
+def parse_prices(xml_text, include_currency: bool = False):
     """
     Parameters
     ----------
     xml_text : str
+    include_currency : bool
+        Include the reported currency alongside each price. No conversion is performed.
 
     Returns
     -------
-    pd.Series
+    dict[str, pd.Series | pd.DataFrame]
     """
     series = {
         '15min': [],
@@ -35,14 +37,22 @@ def parse_prices(xml_text):
     }
     for soup in _extract_timeseries(xml_text):
         soup_series = _parse_timeseries_generic(soup, 'price.amount')
+        if include_currency:
+            currency_element = soup.find('currency_unit.name')
+            currency = currency_element.text if currency_element is not None else None
         for key in series.keys():
-            series[key].append(soup_series[key])
+            parsed_series = soup_series[key]
+            if include_currency and parsed_series is not None:
+                parsed_series = parsed_series.to_frame(name='Price')
+                parsed_series['Currency'] = currency
+            series[key].append(parsed_series)
 
     for freq, freq_series in series.items():
         try:
             series[freq] = pd.concat(freq_series).sort_index()
         except ValueError:
-            series[freq] = pd.Series()
+            series[freq] = (pd.DataFrame(columns=['Price', 'Currency'])
+                            if include_currency else pd.Series())
     return series
 
 

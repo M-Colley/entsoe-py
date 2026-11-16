@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "**"
+      - "workflow_dispatch"
 
 env:
   ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}

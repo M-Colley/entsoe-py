@@ -1291,7 +1291,8 @@ class EntsoePandasClient(EntsoeRawClient):
             self, country_code: Union[Area, str],
             start: pd.Timestamp,
             end: pd.Timestamp,
-            resolution = None) -> pd.Series:
+            resolution = None,
+            include_currency: bool = False) -> Union[pd.Series, pd.DataFrame]:
         """
         Parameters
         ----------
@@ -1299,10 +1300,12 @@ class EntsoePandasClient(EntsoeRawClient):
         country_code : Area|str
         start : pd.Timestamp
         end : pd.Timestamp
+        include_currency : bool
+            Return Price and Currency columns instead of a Series. Prices are not converted.
 
         Returns
         -------
-        pd.Series
+        pd.Series | pd.DataFrame
         """
         if resolution is not None:
             with warnings.catch_warnings():
@@ -1313,7 +1316,8 @@ class EntsoePandasClient(EntsoeRawClient):
         series = self._query_day_ahead_prices(
             area,
             start=start-pd.Timedelta(days=1),
-            end=end+pd.Timedelta(days=1)
+            end=end+pd.Timedelta(days=1),
+            include_currency=include_currency
         )
         series = series.tz_convert(area.tz).sort_index()
         series = series.truncate(before=start, after=end)
@@ -1328,7 +1332,8 @@ class EntsoePandasClient(EntsoeRawClient):
             self, area: Area,
             start: pd.Timestamp,
             end: pd.Timestamp,
-            offset: int = 0) -> pd.Series:
+            offset: int = 0,
+            include_currency: bool = False) -> Union[pd.Series, pd.DataFrame]:
         text = super(EntsoePandasClient, self).query_day_ahead_prices(
             area,
             start=start,
@@ -1336,7 +1341,7 @@ class EntsoePandasClient(EntsoeRawClient):
             offset=offset,
             sequence=1 if area.name in ['DE_LU', 'AT'] else None
         )
-        series_all = parse_prices(text)
+        series_all = parse_prices(text, include_currency=include_currency)
 
         # This function should only return SDAC prices, which have a fixed defined resolution
         # before 2025-10-01 its 60min, after 15min

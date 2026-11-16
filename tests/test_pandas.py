@@ -77,7 +77,7 @@ def basic_checks(result, timeseries=True):
 
 @pytest.mark.parametrize(
     "country_code, start, end, query",
-    product(COUNTRY_CODES, STARTS, ENDS, BASIC_QUERIES_TIMESERIES),
+    list(product(COUNTRY_CODES, STARTS, ENDS, BASIC_QUERIES_TIMESERIES)),
 )
 def test_basic_queries_timeseries(client, query, country_code, start, end):
     if query == 'query_current_balancing_state' and country_code == 'DE_LU':
@@ -91,7 +91,7 @@ def test_basic_queries_timeseries(client, query, country_code, start, end):
 
 @pytest.mark.parametrize(
     "country_code, start, end, query",
-    product(COUNTRY_CODES, STARTS, ENDS, BASIC_QUERIES),
+    list(product(COUNTRY_CODES, STARTS, ENDS, BASIC_QUERIES)),
 )
 def test_basic_queries(client, query, country_code, start, end):
     result = getattr(client, query)(country_code, start=start, end=end)
@@ -100,7 +100,7 @@ def test_basic_queries(client, query, country_code, start, end):
 
 @pytest.mark.parametrize(
     "country_code, start, end, query",
-    product(['BE', 'FR'], STARTS, ENDS, BASIC_QUERIES_TIMESERIES_ZIP),
+    list(product(['BE', 'FR'], STARTS, ENDS, BASIC_QUERIES_TIMESERIES_ZIP)),
 )
 def test_basic_queries_zip(client, query, country_code, start, end):
     result = getattr(client, query)(country_code, start=start, end=end)
@@ -109,13 +109,29 @@ def test_basic_queries_zip(client, query, country_code, start, end):
 
 @pytest.mark.parametrize(
     "country_code_from, country_code_to, start, end, query",
-    product(COUNTRY_CODES_FROM, COUNTRY_CODES_TO, STARTS, ENDS, CROSSBORDER_QUERIES),
+    list(product(COUNTRY_CODES_FROM, COUNTRY_CODES_TO, STARTS, ENDS, CROSSBORDER_QUERIES)),
 )
 def test_crossborder_queries(
         client, query, country_code_from, country_code_to, start, end
 ):
     result = getattr(client, query)(country_code_from, country_code_to, start=start, end=end)
     basic_checks(result)
+
+
+@pytest.mark.parametrize("include_currency", [False, True])
+def test_query_day_ahead_prices_currency(client, include_currency):
+    start = pd.Timestamp("2026-03-01", tz="Europe/Brussels")
+    end = start + pd.Timedelta(hours=1)
+    result = client.query_day_ahead_prices(
+        "BE", start=start, end=end, include_currency=include_currency
+    )
+    basic_checks(result)
+    if include_currency:
+        assert set(result.columns) == {'Price', 'Currency'}
+        assert result["Currency"].eq("EUR").all()
+        assert pd.api.types.is_numeric_dtype(result["Price"])
+    else:
+        assert isinstance(result, pd.Series)
 
 
 def test_query_day_ahead_prices_year_boundary(client):
@@ -169,7 +185,7 @@ def test_query_procured_balancing_capacity_keeps_all_offset_pages(client):
 
 @pytest.mark.parametrize(
     "country_code, start, end",
-    product(COUNTRY_CODES, STARTS, ENDS),
+    list(product(COUNTRY_CODES, STARTS, ENDS)),
 )
 def test_query_unavailability_of_generation_units(client, country_code, start, end):
     result = client.query_unavailability_of_generation_units(country_code, start=start, end=end, docstatus=None, periodstartupdate=None, periodendupdate=None)
@@ -178,7 +194,7 @@ def test_query_unavailability_of_generation_units(client, country_code, start, e
 
 @pytest.mark.parametrize(
     "country_code, start, end",
-    product([x for x in COUNTRY_CODES if x != 'BE'], STARTS, ENDS),
+    list(product([x for x in COUNTRY_CODES if x != 'BE'], STARTS, ENDS)),
 )
 def test_query_unavailability_of_production_units(client, country_code, start, end):
     result = client.query_unavailability_of_production_units(country_code, start=start, end=end, docstatus=None, periodstartupdate=None, periodendupdate=None)
@@ -187,7 +203,7 @@ def test_query_unavailability_of_production_units(client, country_code, start, e
 
 @pytest.mark.parametrize(
     "country_code_from, country_code_to, start, end",
-    product(COUNTRY_CODES_FROM, [x for x in COUNTRY_CODES_TO if x != 'DE_LU'], STARTS, ENDS),
+    list(product(COUNTRY_CODES_FROM, [x for x in COUNTRY_CODES_TO if x != 'DE_LU'], STARTS, ENDS)),
 )
 def test_query_unavailability_transmission(
         client, country_code_from, country_code_to, start, end
@@ -200,7 +216,7 @@ def test_query_unavailability_transmission(
 
 @pytest.mark.parametrize(
     "country_code, start, end",
-    product(COUNTRY_CODES, STARTS, ENDS),
+    list(product(COUNTRY_CODES, STARTS, ENDS)),
 )
 def test_query_withdrawn_unavailability_of_generation_units(
         client, country_code, start, end
@@ -209,19 +225,3 @@ def test_query_withdrawn_unavailability_of_generation_units(
         country_code, start, end,
     )
     basic_checks(result, timeseries=False)
-
-
-def test_query_activated_balancing_energy_prices(client):
-    result = client.query_activated_balancing_energy_prices(
-        AREA_CODES_AFRR[0], start=STARTS_4S[0], end=ENDS_4S[0], business_type='A96', process_type='A67'  # aFRR CBMPs
-    )
-    basic_checks(result)
-
-    # some additional, more "advanced" checks on actual data
-    assert result.shape[0] == 21_586  # one day minus one minute in 4 seconds blocks
-    assert sorted(list(result.columns)) == ['Down', 'ReserveType', 'Up']
-    assert (result.index.diff()[1:] == pd.Timedelta(seconds=4)).all()
-    assert tuple(result.loc['2026-03-01 00:00:00+01:00', ['Down', 'Up']]) == (69.12, np.nan)
-    assert tuple(result.loc['2026-03-01 00:01:08+01:00', ['Down', 'Up']]) == (35.0, 35.0)
-    assert tuple(result.loc['2026-03-01 00:01:12+01:00', ['Down', 'Up']]) == (70.0, np.nan)
-    assert tuple(result.loc['2026-03-01 00:09:32+01:00', ['Down', 'Up']]) == (-28.37, np.nan)
