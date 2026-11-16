@@ -24,26 +24,34 @@ def _mask_security_token(text: str) -> str:
 
 
 def retry(func):
-    """Retries connection errors and masks API keys in Requests exceptions."""
+    """Retries connection errors and HTTP 527/599, masking API keys in exceptions."""
 
     @wraps(func)
     def retry_wrapper(*args, **kwargs):
         self = args[0]
         error = None
         try:
-            for _ in range(self.retry_count):
+            for attempt in range(self.retry_count):
                 try:
                     result = func(*args, **kwargs)
                 # Apart from common (ConnectionError and gaierror) errors, in certain
                 # cases (e.g. with scheduled commercial exchanges), the connection with
                 # ENTSO-e's can break with a RemoteDisconnected exception
-                except (requests.ConnectionError, gaierror, RemoteDisconnected) as e:
+                except (requests.ConnectionError, gaierror, RemoteDisconnected,
+                        requests.HTTPError) as e:
+                    if isinstance(e, requests.HTTPError):
+                        if e.response is None or e.response.status_code not in (527, 599):
+                            raise
+                        reason = f"HTTP {e.response.status_code}"
+                    else:
+                        reason = "Connection Error"
                     error = e
-                    logger.warning(
-                        "Connection Error, "
-                        f"retrying in {self.retry_delay} seconds"
-                    )
-                    sleep(self.retry_delay)
+                    if attempt + 1 < self.retry_count:
+                        logger.warning(
+                            "%s, retrying in %s seconds",
+                            reason, self.retry_delay
+                        )
+                        sleep(self.retry_delay)
                     continue
                 else:
                     return result

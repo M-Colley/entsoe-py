@@ -61,7 +61,7 @@ class EntsoeRawClient:
 
     def __init__(
             self, api_key: str = None, session: Optional[requests.Session] = None,
-            retry_count: int = 3, retry_delay: int = 10,
+            retry_count: int = 3, retry_delay: int = 60,
             proxies: Optional[Dict] = None, timeout: Optional[int] = None):
         """
         Parameters
