@@ -818,11 +818,14 @@ def _parse_installed_capacity_per_plant(soup):
                     'Bidding Zone': 'inbiddingzone_domain.mrid',
                     # 'Status': 'businesstype',
                     'Voltage Connection Level [kV]':
-                        'production_powersystemresources.highvoltagelimit'}
+                        'voltage_powersystemresources.highvoltagelimit'}
     series = pd.Series(extract_vals).apply(lambda v: soup.find(v).text)
 
     period = soup.find('period')
-    series["Start"] = pd.to_datetime(period.find('timeinterval.start').text)
+    start_element = period.find('timeinterval.start')
+    if start_element is None:
+        start_element = period.find('timeinterval').find('start')
+    series["Start"] = pd.to_datetime(start_element.text)
 
     # extract only first point
     series['Installed Capacity [MW]'] = \

@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=XMLParsedAsHTMLWarning)
 
 __title__ = "entsoe-py"
-__version__ = "0.8.2"
-__author__ = "EnergieID.be, Frank Boerman"
+__version__ = "1.0.0"
+__author__ = "EnergieID.be, Frank Boerman-Lima"
 __license__ = "MIT"
 
 URL = os.getenv("ENTSOE_ENDPOINT_URL") or "https://web-api.tp.entsoe.eu/api"
