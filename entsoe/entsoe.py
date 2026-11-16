@@ -846,9 +846,9 @@ class EntsoeRawClient:
         if business_type:
             params.update({'businessType': business_type})
         if standard_market_product:
-            params.update({'standardMarketProduct': standard_market_product})
+            params.update({'Standard_MarketProduct': standard_market_product})
         if original_market_product:
-            params.update({'originalMarketProduct': original_market_product})
+            params.update({'Original_MarketProduct': original_market_product})
         response = self._base_request(params=params, start=start, end=end)
         
         return response.content
