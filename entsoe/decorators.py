@@ -24,34 +24,39 @@ def _mask_security_token(text: str) -> str:
 
 
 def retry(func):
-    """Catches connection errors, waits and retries"""
+    """Retries connection errors and masks API keys in Requests exceptions."""
 
     @wraps(func)
     def retry_wrapper(*args, **kwargs):
         self = args[0]
         error = None
-        for _ in range(self.retry_count):
-            try:
-                result = func(*args, **kwargs)
-            # Apart from common (ConnectionError and gaierror) errors, in certain
-            # cases (e.g. with scheduled commercial exchanges), the connection with
-            # ENTSO-e's can break with a RemoteDisconnected exception
-            except (requests.ConnectionError, gaierror, RemoteDisconnected) as e:
-                error = e
-                logger.warning(
-                    "Connection Error, "
-                    f"retrying in {self.retry_delay} seconds"
-                )
-                sleep(self.retry_delay)
-                continue
+        try:
+            for _ in range(self.retry_count):
+                try:
+                    result = func(*args, **kwargs)
+                # Apart from common (ConnectionError and gaierror) errors, in certain
+                # cases (e.g. with scheduled commercial exchanges), the connection with
+                # ENTSO-e's can break with a RemoteDisconnected exception
+                except (requests.ConnectionError, gaierror, RemoteDisconnected) as e:
+                    error = e
+                    logger.warning(
+                        "Connection Error, "
+                        f"retrying in {self.retry_delay} seconds"
+                    )
+                    sleep(self.retry_delay)
+                    continue
+                else:
+                    return result
             else:
-                return result
-        else:
-            if isinstance(error, requests.RequestException):
-                # requests puts the request URL, API key included, in the message
-                error = type(error)(_mask_security_token(str(error)),
-                                    request=error.request, response=error.response)
-            raise error
+                raise error
+        except requests.RequestException as error:
+            message = _mask_security_token(str(error))
+            if message == str(error):
+                raise
+            # Mask non-retryable errors too, without exposing the original
+            # message through exception chaining.
+            raise type(error)(message, request=error.request,
+                              response=error.response) from None
 
     return retry_wrapper
 
