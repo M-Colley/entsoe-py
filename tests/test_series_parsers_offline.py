@@ -56,3 +56,10 @@ def test_many_points_have_unique_sorted_index(n):
     xml = _xml('PT15M', '2024-01-01T00:00Z', '2024-01-02T00:00Z', [(i, i) for i in range(1, n + 1)])
     series = _parse(xml)
     assert series.index.is_monotonic_increasing and series.index.is_unique and len(series) == n
+
+
+def test_repeated_position_keeps_last_value():
+    xml = _xml('PT60M', '2024-01-01T00:00Z', '2024-01-01T02:00Z', [(1, '10'), (1, '11'), (2, '12')])
+    series = _parse(xml)
+    assert list(series.values) == [11.0, 12.0]
+    assert series.index.is_unique

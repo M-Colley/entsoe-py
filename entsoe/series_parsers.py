@@ -112,7 +112,9 @@ def _parse_points(period, start, delta, label, to_float):
         index = (start + pd.to_timedelta((positions - 1) * delta.nanos, unit='ns')).as_unit(start.unit)
     else:
         index = [start + (int(p) - 1) * delta for p in positions]
-    return pd.Series(values, index=index)
+    series = pd.Series(values, index=index)
+    # a repeated position keeps its last value, as the previous dict-based parsing did
+    return series[~series.index.duplicated(keep='last')]
 
 
 def _parse_timeseries_generic(soup, label='quantity', to_float=True, merge_series=False, period_name='period'):
